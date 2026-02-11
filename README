@@ -1,0 +1,21 @@
+cf-rotation-tool
+
+This Rust-based tool is designed to allow you to rotate DNS entries as you wish. You need a domain bought from Cloudflare, its ZoneID, and your Cloudflare API Token. Put both into your environment with
+
+export CLOUDFLARE_API_KEY=<your-api-key>
+export ZONE_ID=<zone_id>
+
+Then you can use the tool for running arbitrary commands to generate and delete random DNS entries. The use case for this tool is to have DNS entries that are guaranteed to not be cached to conduct DNS measurements on them. You can self-compile the tool using the Rust toolchain:
+
+cd /path/to/repo/root
+cargo build --release
+./target/release/cf-dns-rotation --help
+
+If your environment has been configured properly, you can run commands like the following:
+
+# Generates an A record pointing to 127.0.0.1
+cf-dns-rotation gen A 127.0.0.1
+# Generates a AAAA records pointing to ::1
+cf-dns-rotation gen AAAA ::1
+# Lists all domains and their IDs generated with this tool
+cf-dns-rotation list-ids
