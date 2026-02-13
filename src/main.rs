@@ -233,12 +233,34 @@ fn delete_domain(cf_api_key: &str, zone_id: &str, domain_id: &str) -> Result<()>
     Ok(())
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
+fn env_is_set(envname: &str) -> bool {
+    match env::var(envname) {
+        Ok(_) => true,
+        _ => false,
+    }
+}
 
-    let zone_id = env::var("ZONE_ID")?;
+fn main() -> Result<()> {
+    // Get Cloudflare API Key or print message that it is missing.
+    if !env_is_set("CLOUDFLARE_API_KEY") {
+        return Err(anyhow!(
+            "Missing Cloudflare API Key (set by `export CLOUDFLARE_API_KEY=your-api-key`)."
+        ));
+    }
     let cf_apikey = env::var("CLOUDFLARE_API_KEY")?;
 
+    // Get Cloudflare Zone ID (= ID of a domain zone entries are created in) or print message that
+    // it is missing.
+    if !env_is_set("ZONE_ID") {
+        return Err(anyhow!(
+            "Missing domain ZoneID. See
+\thttps://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/
+for further instructions on how to find the zone ID and then set it via `export ZONE_ID=your-zone-id`."
+        ));
+    }
+    let zone_id = env::var("ZONE_ID")?;
+
+    let cli = Cli::parse();
     match &cli.command {
         Commands::Gen(args) => {
             let rr_type = args.rr_type.clone().expect("Expected a given RR type.");
