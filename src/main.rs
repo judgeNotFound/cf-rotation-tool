@@ -24,6 +24,8 @@ enum Commands {
     Del(Del),
     /// Lists existing DNS entries.
     ListIds(ListIds),
+    /// Returns the ID for the given domain.
+    DomainId(DomainId),
 }
 
 #[derive(Args)]
@@ -49,6 +51,11 @@ struct ListIds {
 #[derive(Args)]
 struct Del {
     id: Option<String>,
+}
+
+#[derive(Args)]
+struct DomainId {
+    domain: Option<String>,
 }
 
 fn _dns_type_supported(_entry_type: &str) -> bool {
@@ -179,12 +186,7 @@ fn print_domains(domains: &HashMap<String, String>, csvoutput: bool) {
     }
 }
 
-fn list_domain_ids(
-    cf_api_key: &str,
-    zone_id: &str,
-    only_auto_generated: bool,
-    csvoutput: bool,
-) -> Result<()> {
+fn get_domains(cf_api_key: &str, zone_id: &str) -> Result<Vec<DnsRecord>, anyhow::Error> {
     let request_url = format!(
         "https://api.cloudflare.com/client/v4/zones/{}/dns_records",
         zone_id
@@ -200,8 +202,19 @@ fn list_domain_ids(
     let _response_body = _response.text().expect("Could not read response");
     let _parsed_body: ApiResponse = serde_json::from_str(&_response_body)?;
 
+    Ok(_parsed_body.result)
+}
+
+fn list_domain_ids(
+    cf_api_key: &str,
+    zone_id: &str,
+    only_auto_generated: bool,
+    csvoutput: bool,
+) -> Result<()> {
+    let domains = get_domains(cf_api_key, zone_id)?;
+
     let mut domain_map: HashMap<String, String> = HashMap::new();
-    for domain in _parsed_body.result.iter() {
+    for domain in domains.iter() {
         if only_auto_generated {
             let comment = domain.comment.clone().unwrap_or("".to_string());
             if comment != "Auto-generated DNS record -- Leave unchanged! --." {
@@ -213,6 +226,21 @@ fn list_domain_ids(
     }
 
     print_domains(&domain_map, csvoutput);
+
+    Ok(())
+}
+
+fn id_for_domain(cf_api_key: &str, zone_id: &str, domain: &str) -> Result<()> {
+    let dns_entries = get_domains(cf_api_key, zone_id)?;
+
+    for entry in dns_entries.iter() {
+        if entry.name == domain {
+            match entry.id.clone() {
+                Some(id) => println!("{}", id),
+                _ => println!("<Unknown>"),
+            }
+        }
+    }
 
     Ok(())
 }
@@ -282,6 +310,15 @@ for further instructions on how to find the zone ID and then set it via `export 
         Commands::Del(args) => {
             let domain_id = args.id.clone().expect("Missing ID of domain to delete.");
             return delete_domain(&cf_apikey, &zone_id, &domain_id);
+        }
+
+        Commands::DomainId(args) => {
+            let domain = args
+                .domain
+                .clone()
+                .expect("Missing domain to retreive an ID for.");
+
+            return id_for_domain(&cf_apikey, &zone_id, &domain);
         }
     }
 }
